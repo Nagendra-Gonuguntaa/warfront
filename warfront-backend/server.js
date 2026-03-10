@@ -11,10 +11,7 @@ const cache = require('./utils/cache');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*'
-}));
-app.use(express.json());
+app.use(cors());
 
 // ── ROUTES ──
 app.use('/api/videos', redditRoutes);
