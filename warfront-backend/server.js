@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
+app.use(express.json());
 
 // ── ROUTES ──
 app.use('/api/videos', redditRoutes);
@@ -20,9 +21,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/map', require('./routes/map'));
 app.use('/api/economy', require('./routes/economy'));
 app.use('/api/gti', require('./routes/gti'));
-app.use('/api/map', require('./routes/map'));
-app.use('/api/economy', require('./routes/economy'));
-app.use('/api/gti', require('./routes/gti'));
+app.use('/api/flights', require('./routes/flights'));
 
 // ── HEALTH CHECK ──
 app.get('/api/health', (req, res) => {

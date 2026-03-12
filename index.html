@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="config.js"></script>
   <style>
     :root {
       --bg: #0a0a08;
@@ -1186,7 +1185,11 @@
     <div class="section" id="map-section">
       <div class="section-header">
         <div class="section-title">Conflict Map</div>
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.1em;">LEAFLET + OPENSTREETMAP — FREE TIER</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button id="btnConflict" onclick="setMapLayer('conflict')" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:5px 12px;border-radius:1px;cursor:pointer;transition:all 0.2s;background:var(--accent2);border:1px solid var(--accent2);color:#fff;">🔴 CONFLICT</button>
+          <button id="btnFlights" onclick="setMapLayer('flights')" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:0.12em;padding:5px 12px;border-radius:1px;cursor:pointer;transition:all 0.2s;background:transparent;border:1px solid var(--border);color:var(--muted);">✈ LIVE FLIGHTS</button>
+          <span id="flightCounter" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.1em;display:none;">— flights</span>
+        </div>
       </div>
       <div id="conflict-map"></div>
     </div>
@@ -1490,7 +1493,129 @@ async function loadMapData() {
   }
 }
 
+
+// ── FLIGHT OVERLAY ──
+let flightMarkers = [];
+let currentMapLayer = 'conflict';
+let flightRefreshInterval = null;
+
+function setMapLayer(layer) {
+  currentMapLayer = layer;
+
+  // Update button styles
+  const btnConflict = document.getElementById('btnConflict');
+  const btnFlights = document.getElementById('btnFlights');
+  const flightCounter = document.getElementById('flightCounter');
+
+  if (layer === 'conflict') {
+    btnConflict.style.background = 'var(--accent2)';
+    btnConflict.style.borderColor = 'var(--accent2)';
+    btnConflict.style.color = '#fff';
+    btnFlights.style.background = 'transparent';
+    btnFlights.style.borderColor = 'var(--border)';
+    btnFlights.style.color = 'var(--muted)';
+    flightCounter.style.display = 'none';
+
+    // Show conflict markers, hide flights
+    mapMarkers.forEach(m => m.addTo(map));
+    clearFlightMarkers();
+
+    // Stop auto-refresh
+    if (flightRefreshInterval) {
+      clearInterval(flightRefreshInterval);
+      flightRefreshInterval = null;
+    }
+  } else {
+    btnFlights.style.background = 'var(--accent)';
+    btnFlights.style.borderColor = 'var(--accent)';
+    btnFlights.style.color = '#000';
+    btnConflict.style.background = 'transparent';
+    btnConflict.style.borderColor = 'var(--border)';
+    btnConflict.style.color = 'var(--muted)';
+    flightCounter.style.display = 'inline';
+    flightCounter.textContent = 'Loading flights...';
+
+    // Hide conflict markers, show flights
+    mapMarkers.forEach(m => map.removeLayer(m));
+    loadFlights();
+
+    // Auto-refresh every 60 seconds
+    flightRefreshInterval = setInterval(loadFlights, 60000);
+  }
+}
+
+function clearFlightMarkers() {
+  flightMarkers.forEach(m => map.removeLayer(m));
+  flightMarkers = [];
+}
+
+function getPlaneIcon(heading) {
+  return L.divIcon({
+    html: `<div style="
+      font-size:16px;
+      transform:rotate(${heading || 0}deg);
+      filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8));
+      line-height:1;
+    ">✈</div>`,
+    className: '',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
+}
+
+async function loadFlights() {
+  try {
+    const res = await fetch(`${API_BASE}/api/flights`);
+    const json = await res.json();
+
+    if (!json.success) throw new Error(json.error);
+
+    clearFlightMarkers();
+
+    const { flights, count, zones, updatedAt } = json.data;
+
+    // Update counter
+    const counter = document.getElementById('flightCounter');
+    if (counter) counter.textContent = `${count} flights over conflict zones`;
+
+    // Plot each flight
+    flights.forEach(f => {
+      const icon = getPlaneIcon(f.heading);
+      const altFt = f.altitude ? Math.round(f.altitude * 3.28084).toLocaleString() : '—';
+      const marker = L.marker([f.lat, f.lng], { icon })
+        .addTo(map)
+        .bindPopup(`
+          <div style="font-family:'IBM Plex Mono',monospace;min-width:200px;">
+            <div style="font-size:9px;color:var(--accent, #c8a84b);letter-spacing:0.1em;margin-bottom:4px;">
+              ✈ LIVE FLIGHT · ${f.zone.toUpperCase()}
+            </div>
+            <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:8px;">
+              ${f.callsign}
+            </div>
+            <div style="font-size:10px;color:#aaa;line-height:1.8;">
+              <div>🌍 Origin country: ${f.origin}</div>
+              <div>📡 ICAO: ${f.icao}</div>
+              ${f.altitude ? `<div>🔼 Altitude: ${altFt} ft</div>` : ''}
+              ${f.speed ? `<div>💨 Speed: ${f.speed} km/h</div>` : ''}
+              ${f.heading ? `<div>🧭 Heading: ${f.heading}°</div>` : ''}
+            </div>
+          </div>
+        `, { maxWidth: 240 });
+      flightMarkers.push(marker);
+    });
+
+    // Zone summary
+    console.log('[Flights]', zones.map(z => `${z.name}: ${z.count}`).join(' | '));
+
+  } catch(err) {
+    console.error('[Flights] Failed:', err.message);
+    const counter = document.getElementById('flightCounter');
+    if (counter) counter.textContent = 'Flight data unavailable';
+  }
+}
+
 // ── BACKEND CONFIG ──
+const API_BASE = 'https://war-front.onrender.com';
 
 // ── HELPERS ──
 function timeAgo(utcSeconds) {
