@@ -18,7 +18,9 @@ app.use('/api/videos', redditRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/map', require('./routes/map'));
+app.use('/api/economy', require('./routes/economy'));
 app.use('/api/map', require('./routes/map'));
+app.use('/api/economy', require('./routes/economy'));
 
 // ── HEALTH CHECK ──
 app.get('/api/health', (req, res) => {
