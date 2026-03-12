@@ -19,8 +19,10 @@ app.use('/api/news', newsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/map', require('./routes/map'));
 app.use('/api/economy', require('./routes/economy'));
+app.use('/api/gti', require('./routes/gti'));
 app.use('/api/map', require('./routes/map'));
 app.use('/api/economy', require('./routes/economy'));
+app.use('/api/gti', require('./routes/gti'));
 
 // ── HEALTH CHECK ──
 app.get('/api/health', (req, res) => {
